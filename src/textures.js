@@ -69,6 +69,28 @@ class Textures {
         }
     }
 
+    getMergedTexture(name, subName) {
+        const textureSprite = this.sprites.get(name);
+
+        let { width, height } = textureSprite;
+        const patternCanvas = createCanvas(width, height);
+        this.plotTexture(patternCanvas, textureSprite);
+
+        const subSprite = this.sprites.get(subName);
+        width = Math.max(width, subSprite.width);
+        height = Math.max(width, subSprite.height);
+
+        const canvas = createCanvas(width, height);
+        const ctx = canvas.getContext('2d');
+        const pattern = ctx.createPattern(textureSprite, 'repeat');
+        ctx.fillStyle = pattern;
+        ctx.fillRect(0, 0, width, height);
+
+        this.plotTexture(canvas, subSprite);
+
+        return canvas;
+    }
+
     // grab the texture sprites corresponding to a specific texture ID in
     // config's texture definitions (name and subName), and assemble a rendered
     // texture.
@@ -82,25 +104,9 @@ class Textures {
             this.plotTexture(canvas, textureSprite);
 
             return canvas;
-        } else {
-            let { width, height } = textureSprite;
-            const patternCanvas = createCanvas(width, height);
-            this.plotTexture(patternCanvas, textureSprite);
-
-            const subSprite = this.sprites.get(subName);
-            width = Math.max(width, subSprite.width);
-            height = Math.max(width, subSprite.height);
-
-            const canvas = createCanvas(width, height);
-            const ctx = canvas.getContext('2d');
-            const pattern = ctx.createPattern(textureSprite, 'repeat');
-            ctx.fillStyle = pattern;
-            ctx.fillRect(0, 0, width, height);
-
-            this.plotTexture(canvas, subSprite);
-
-            return canvas;
         }
+
+        return this.getMergedTexture(name, subName);
     }
 
     toArchive() {

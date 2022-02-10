@@ -20,13 +20,16 @@ async function dumpSprites(output, spriteMap) {
             for (const sprite of sprites) {
                 await fs.writeFile(
                     path.join(output, name, `${index}.png`),
-                    sprite.toBuffer());
+                    sprite.toBuffer()
+                );
+
                 index += 1;
             }
         } else {
             await fs.writeFile(
                 path.join(output, `${name}.png`),
-                sprites[0].toBuffer());
+                sprites[0].toBuffer()
+            );
         }
     }
 }
@@ -37,7 +40,7 @@ yargs
     .command(
         'dump-sprites <config> <archive>',
         'dump sprites PNGs from entitiy, media or textures jag/mem archives',
-        yargs => {
+        (yargs) => {
             yargs.positional('config', {
                 description: 'config jag archive',
                 type: 'string'
@@ -50,9 +53,16 @@ yargs
 
             yargs.option('type', {
                 alias: 't',
-                description: 'manually specify the archive type (entity, ' +
+                description:
+                    'manually specify the archive type (entity, ' +
                     'media or textures)',
                 type: 'string'
+            });
+
+            yargs.option('merge', {
+                alias: 'm',
+                description: 'also dump textures that rely on two textures',
+                type: 'boolean'
             });
 
             yargs.option('output', {
@@ -61,7 +71,7 @@ yargs
                 type: 'string'
             });
         },
-        async argv => {
+        async (argv) => {
             try {
                 const config = new Config();
                 config.loadArchive(await fs.readFile(argv.config));
@@ -70,15 +80,20 @@ yargs
 
                 if (argv.type === 'entity' || /entity/i.test(argv.archive)) {
                     spriteArchive = new EntitySprites(config);
-                } else if (argv.type === 'media' ||
-                    /media/i.test(argv.archive)) {
+                } else if (
+                    argv.type === 'media' ||
+                    /media/i.test(argv.archive)
+                ) {
                     spriteArchive = new MediaSprites(config);
-                } else if (argv.type === 'textures' ||
-                    /textures/i.test(argv.archive)) {
+                } else if (
+                    argv.type === 'textures' ||
+                    /textures/i.test(argv.archive)
+                ) {
                     spriteArchive = new Textures(config);
                 } else {
-                    throw new Error('unable to determine archive type from ' +
-                        'filename');
+                    throw new Error(
+                        'unable to determine archive type from filename'
+                    );
                 }
 
                 spriteArchive.loadArchive(await fs.readFile(argv.archive));
@@ -92,23 +107,38 @@ yargs
 
                 await mkdirp(output);
                 await dumpSprites(output, spriteArchive.sprites);
+
+                if (
+                    argv.merge &&
+                    spriteArchive.constructor.name === 'Textures'
+                ) {
+                    const mergedTextures = new Map();
+
+                    for (const { name, subName } of config.textures) {
+                        if (!subName || !subName.length) {
+                            continue;
+                        }
+
+                        mergedTextures.set(
+                            `${name}-${subName}`,
+                            spriteArchive.getMergedTexture(name, subName)
+                        );
+                    }
+
+                    await dumpSprites(output, mergedTextures);
+                }
             } catch (e) {
                 process.exitCode = 1;
                 console.error(e);
             }
-        })
+        }
+    )
     .command(
         'pack-sprites <archive> <files..>',
         'pack PNG file(s) into a sprites jag or mem archive',
-        yargs => {
-        },
-        async argv => {
-        })
-    .command(
-        'dump-items <config> <archive>'
+        (yargs) => {},
+        async (argv) => {}
     )
-    .command(
-        'dump-npcs <config> <archive>'
-    )
-    .demandCommand()
-    .argv;
+    .command('dump-items <config> <archive>')
+    .command('dump-npcs <config> <archive>')
+    .demandCommand().argv;
