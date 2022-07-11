@@ -11,9 +11,8 @@ const { EntitySprites, MediaSprites, Textures } = require('./');
 async function dumpSprites(output, spriteMap) {
     for (let [name, sprites] of spriteMap.entries()) {
         sprites = Array.isArray(sprites) ? sprites : [sprites];
-
         if (sprites.length > 1) {
-            await mkdirp(path.join(output, name));
+            fs.mkdir(path.join(output, name))
 
             let index = 0;
 
@@ -75,9 +74,9 @@ yargs
             try {
                 const config = new Config();
                 config.loadArchive(await fs.readFile(argv.config));
-
+                
                 let spriteArchive;
-
+                
                 if (argv.type === 'entity' || /entity/i.test(argv.archive)) {
                     spriteArchive = new EntitySprites(config);
                 } else if (
@@ -99,13 +98,12 @@ yargs
                 spriteArchive.loadArchive(await fs.readFile(argv.archive));
 
                 let output = argv.output;
-
                 if (!output) {
                     const ext = path.extname(argv.archive);
                     output = `${path.basename(argv.archive, ext)}-png`;
                 }
 
-                await mkdirp(output);
+                fs.mkdir(output);
                 await dumpSprites(output, spriteArchive.sprites);
 
                 if (
