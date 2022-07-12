@@ -2,11 +2,14 @@
 
 const { Config } = require('@2003scape/rsc-config');
 const fs = require('fs').promises;
-const mkdirp = require('mkdirp-promise');
 const path = require('path');
 const pkg = require('../package');
 const yargs = require('yargs');
 const { EntitySprites, MediaSprites, Textures } = require('./');
+const compressSprites = require('./compress-sprites');
+const { Image, createCanvas, loadImage } = require('canvas');
+
+let fileNames = "a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,zz,zzz,zzzz".split(",");
 
 async function dumpSprites(output, spriteMap) {
     for (let [name, sprites] of spriteMap.entries()) {
@@ -18,7 +21,7 @@ async function dumpSprites(output, spriteMap) {
 
             for (const sprite of sprites) {
                 await fs.writeFile(
-                    path.join(output, name, `${index}.png`),
+                    path.join(output, name, `${fileNames[index]}.png`),
                     sprite.toBuffer()
                 );
 
@@ -31,6 +34,25 @@ async function dumpSprites(output, spriteMap) {
             );
         }
     }
+}
+
+async function createImage(path) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onerror = err => reject(err);
+        image.onload = () => resolve(image);
+        image.src = path;
+    })
+}
+
+async function toCanvas(path) {
+    const image = await createImage(path);
+
+    const canvas = createCanvas(image.width, image.height);
+    const context = canvas.getContext('2d');
+    let loadedImage = await loadImage(path);
+    context.drawImage(loadedImage, 0, 0)
+    return canvas;
 }
 
 yargs
@@ -104,6 +126,7 @@ yargs
                 }
 
                 fs.mkdir(output);
+
                 await dumpSprites(output, spriteArchive.sprites);
 
                 if (
@@ -133,9 +156,59 @@ yargs
     )
     .command(
         'pack-sprites <archive> <files..>',
-        'pack PNG file(s) into a sprites jag or mem archive',
-        (yargs) => {},
-        async (argv) => {}
+        'pack PNG file(s) into a sprites jag archive',
+        yargs => {
+            yargs.positional('archive', {
+                description: 'entity, media or textures jag/mem archive',
+                type: 'string'
+            });
+            yargs.positional('files', {
+                description: 'Dumped files to create a new archive'
+            });
+            yargs.positional('type', {
+                description: 'entity, media, or textures',
+                type: 'string'
+            });
+        },
+        async argv => {
+            const writeArchive = async (archive, filename) => {
+                await fs.writeFile(filename, archive);
+                };
+            if (argv.type === 'entity' || /entity/i.test(argv.archive)) {
+                try {
+                    const ext = path.extname(argv.archive);
+                    const archiveFileBase = argv.archive.split(ext)[0].replace(/[0-9]/g, '');
+                    const archiveAddEdition = Number(argv.archive.split(ext)[0].replace(/\D/g,'')) + 1;
+                    const newArchiveFileName = archiveFileBase + archiveAddEdition + ext;
+
+                    let spriteMapToEncode = new Map();
+
+                    for (const filename in argv.files) {
+    
+                        let subFolderFullName = argv.files[filename];
+                        let subFolderPartialName = argv.files[filename].split("/")[1];
+                        let subFolderValue = await fs.readdir(argv.files[filename]);
+    
+                        let canvasArray = [];
+
+                        for(const png of subFolderValue) {
+                            let pngFileLocation = subFolderFullName + "/" + png;
+                            let newCanvas = await toCanvas(`${pngFileLocation}`);
+    
+                            canvasArray.push(newCanvas);
+                        }
+                        spriteMapToEncode.set(subFolderPartialName, canvasArray);
+                    }
+
+                    let spritesToEncode = compressSprites(spriteMapToEncode);
+
+                    await writeArchive(spritesToEncode, `${newArchiveFileName}`);
+
+                } catch (e) {
+                    console.log(e);
+                }
+            }
+        }
     )
     .command('dump-items <config> <archive>')
     .command('dump-npcs <config> <archive>')

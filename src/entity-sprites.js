@@ -31,7 +31,6 @@ class EntitySprites {
     loadArchive(buffer) {
         const archive = new JagArchive();
         archive.readArchive(buffer);
-
         const indexData = getDataBuffer(archive, 'index');
 
         for (const { name, hasA, hasF } of this.animations) {
@@ -41,8 +40,7 @@ class EntitySprites {
 
             try {
                 let spriteData = getDataBuffer(archive, name);
-                const frames = parseSprite(spriteData, indexData, 15);
-
+                let frames = parseSprite(spriteData, indexData, 15);
                 if (hasA) {
                     spriteData = getDataBuffer(archive, `${name}a`);
                     frames.push(...parseSprite(spriteData, indexData, 3));
@@ -52,7 +50,6 @@ class EntitySprites {
                     spriteData = getDataBuffer(archive, `${name}f`);
                     frames.push(...parseSprite(spriteData, indexData, 9));
                 }
-
                 this.sprites.set(name.toLowerCase(), frames);
             } catch (e) {
                 // probably members animations when we only loaded free archive
