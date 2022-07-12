@@ -40,10 +40,8 @@ function getOffset(frame) {
 // encode a collection of frames with the same palette
 function encodeSprite(frames) {
     frames = Array.isArray(frames) ? frames : [frames];
-
     const fullWidth = frames[0].width;
     const fullHeight = frames[0].height;
-
     const palette = [0xff00ff];
     const encodedFrames = [];
 
