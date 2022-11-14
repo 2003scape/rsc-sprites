@@ -1,8 +1,12 @@
 {
   "name": "@2003scape/rsc-sprites",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "(de)serialize runescape classic entity, ui and texture images",
   "main": "./src/index.js",
+  "type": "module",
+  "bin": {
+    "rsc-sprites": "./src/bin.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/2003scape/rsc-sprites.git"
@@ -23,11 +27,9 @@
   },
   "homepage": "https://github.com/2003scape/rsc-sprites#readme",
   "dependencies": {
-    "@2003scape/rsc-archiver": "^1.1.0",
-    "@2003scape/rsc-config": "^1.0.0",
-    "@swiftcarrot/color-fns": "^3.0.4",
-    "canvas": "^2.6.1",
-    "mkdirp-promise": "^5.0.1",
-    "trim-canvas": "^0.1.2"
+    "@2003scape/rsc-archiver": "^2.0.0",
+    "@swiftcarrot/color-fns": "^3.2.0",
+    "canvaskit-wasm": "^0.37.1",
+    "yargs": "^17.6.2"
   }
 }

@@ -1,9 +1,5 @@
-const JagBuffer = require('@2003scape/rsc-archiver/src/jag-buffer');
-const colourizeSprite = require('./colourize-sprite');
-const compressSprites = require('./compress-sprites');
-const parseSprite = require('./parse-sprite');
-const { JagArchive } = require('@2003scape/rsc-archiver');
-const { createCanvas } = require('canvas');
+import SpriteArchive from './sprite-archive.js';
+import { JagBuffer } from '@2003scape/rsc-archiver';
 
 const animationOrder = {
     front: [11, 2, 9, 7, 1, 6, 8, 0, 5, 3, 4], // angles 0-7
@@ -18,21 +14,18 @@ function getDataBuffer(archive, name) {
 }
 
 // NPC, player and equipment sprites
-class EntitySprites {
+class EntitySprites extends SpriteArchive {
     constructor({ animations, npcs }) {
+        super();
+
         this.animations = animations;
         this.npcs = npcs;
-
-        // .sprites contains both free and mem keys linking to the same
-        // collection
-        this.sprites = new Map();
     }
 
     loadArchive(buffer) {
-        const archive = new JagArchive();
-        archive.readArchive(buffer);
+        super.loadArchive(buffer);
 
-        const indexData = getDataBuffer(archive, 'index');
+        const indexData = getDataBuffer(this.archive, 'index');
 
         for (const { name, hasA, hasF } of this.animations) {
             if (this.sprites.has(name.toLowerCase())) {
@@ -40,17 +33,17 @@ class EntitySprites {
             }
 
             try {
-                let spriteData = getDataBuffer(archive, name);
-                const frames = parseSprite(spriteData, indexData, 15);
+                let spriteData = getDataBuffer(this.archive, name);
+                const frames = this.parseSprite(spriteData, indexData, 15);
 
                 if (hasA) {
-                    spriteData = getDataBuffer(archive, `${name}a`);
-                    frames.push(...parseSprite(spriteData, indexData, 3));
+                    spriteData = getDataBuffer(this.archive, `${name}a`);
+                    frames.push(...this.parseSprite(spriteData, indexData, 3));
                 }
 
                 if (hasF) {
-                    spriteData = getDataBuffer(archive, `${name}f`);
-                    frames.push(...parseSprite(spriteData, indexData, 9));
+                    spriteData = getDataBuffer(this.archive, `${name}f`);
+                    frames.push(...this.parseSprite(spriteData, indexData, 9));
                 }
 
                 this.sprites.set(name.toLowerCase(), frames);
@@ -62,12 +55,24 @@ class EntitySprites {
     }
 
     // get an array of canvas objects for every angle of an animation
-    getSpritesByAnimationId(id) {
-        const { name, colour } = this.animations[id];
+    getSpritesByAnimationID(id) {
+        const animation = this.animations[id];
 
-        return this.sprites.get(name.toLowerCase()).map(canvas => {
+        if (!animation) {
+            throw new RangeError(`animation ID ${id} not found`);
+        }
+
+        const { name, colour } = animation;
+
+        const sprite = this.sprites.get(name.toLowerCase());
+
+        if (!sprite) {
+            throw new Error(`sprite "${name}" not found`);
+        }
+
+        return sprite.map((canvas) => {
             if (id > 7) {
-                return colourizeSprite(canvas, colour);
+                return this.colourizeSprite(canvas, colour);
             }
 
             return canvas;
@@ -78,16 +83,14 @@ class EntitySprites {
     // being an angle of the assembled animations. colours is an object
     // with hair/torso/etc colours.
     assembleAnimationSprites(ids, colours = {}) {
-        const animations = ids.map(id => {
-            return id !== null ? this.getSpritesByAnimationId(id) : null;
+        const animations = ids.map((id) => {
+            return id !== null ? this.getSpritesByAnimationID(id) : null;
         });
-
-        let frameCount = 17;
 
         // an array of canvases of each angle
         const assembled = [];
 
-        for (let angle = 0; angle < frameCount; angle += 1) {
+        for (let angle = 0; angle < 17; angle += 1) {
             let order = animationOrder.front;
 
             if (angle > 7 && angle < 15) {
@@ -109,36 +112,45 @@ class EntitySprites {
                     continue;
                 }
 
-                let canvas;
+                const canvas = assembled[angle]
+                    ? assembled[angle]
+                    : this.createCanvas(
+                          spriteCanvas.width,
+                          spriteCanvas.height
+                      );
 
-                if (assembled[angle]) {
-                    canvas = assembled[angle];
-                } else {
-                    canvas =
-                        createCanvas(spriteCanvas.width, spriteCanvas.height);
-                }
-
-                const ctx = canvas.getContext('2d');
+                const context = canvas.getContext('2d');
                 const animationId = ids[order[i]];
                 let colouredSprite = spriteCanvas;
 
-                if (animationId === 0 ||
-                    animationId === 3 || animationId === 5 ||
-                    animationId === 6 || animationId === 7) {
-                    colouredSprite =
-                        colourizeSprite(spriteCanvas, colours.hairColour,
-                            colours.skinColour);
+                if (
+                    animationId === 0 ||
+                    animationId === 3 ||
+                    animationId === 5 ||
+                    animationId === 6 ||
+                    animationId === 7
+                ) {
+                    colouredSprite = this.colourizeSprite(
+                        spriteCanvas,
+                        colours.hairColour,
+                        colours.skinColour
+                    );
                 } else if (animationId === 1 || animationId === 4) {
-                    colouredSprite =
-                        colourizeSprite(spriteCanvas, colours.topColour,
-                            colours.skinColour);
+                    colouredSprite = this.colourizeSprite(
+                        spriteCanvas,
+                        colours.topColour,
+                        colours.skinColour
+                    );
                 } else if (animationId === 2) {
-                    colouredSprite =
-                        colourizeSprite(spriteCanvas, colours.bottomColour,
-                            colours.skinColour);
+                    colouredSprite = this.colourizeSprite(
+                        spriteCanvas,
+                        colours.bottomColour,
+                        colours.skinColour
+                    );
                 }
 
-                ctx.drawImage(colouredSprite, 0, 0);
+                this.drawImage(canvas, colouredSprite);
+
                 assembled[angle] = canvas;
             }
         }
@@ -146,31 +158,42 @@ class EntitySprites {
         return assembled;
     }
 
-    getSpritesByNpcId(id) {
+    getSpritesByNPCID(id) {
         const npc = this.npcs[id];
-        const animationSprites =
-            this.assembleAnimationSprites(npc.animations, npc);
+
+        const animationSprites = this.assembleAnimationSprites(
+            npc.animations,
+            npc
+        );
+
+        console.log('npcid', id, npc.width, npc.height);
 
         return animationSprites.map((canvas, angle) => {
-            const resizedCanvas = createCanvas(npc.width, npc.height);
-            const ctx = resizedCanvas.getContext('2d');
-            ctx.imageSmoothingEnabled = false;
-
-            if (angle < 15) {
-                ctx.drawImage(canvas, 0, 0, npc.width, npc.height);
-            } else {
-                resizedCanvas.width = npc.width * 1.33;
-                ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(canvas, 0, 0, npc.width * 1.33, npc.height);
-            }
-
-            return resizedCanvas;
+            //const resized = this.createCanvas(npc.width, npc.height)
+            //this.drawImage(resized, canvas, 0, 0, npc.width, npc.height);
+            //return resized;
+            return canvas;
         });
     }
 
+    // toJag and toMem?
     toArchive() {
-        return compressSprites(this.sprites);
+        const sprites = new Map();
+
+        for (const [name, frames] of this.sprites.entries()) {
+            if (frames.length >= 18) {
+                sprites.set(`${name}a`, frames.slice(15, 18));
+            }
+
+            if (frames.length === 27) {
+                sprites.set(`${name}f`, frames.slice(18, 27));
+            }
+
+            sprites.set(name, frames.slice(0, 15));
+        }
+
+        return this.compressSprites(sprites);
     }
 }
 
-module.exports = EntitySprites;
+export default EntitySprites;

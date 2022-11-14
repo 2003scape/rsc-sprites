@@ -1,6 +1,5 @@
-const EntitySprites = require('./entity-sprites');
-const MediaSprites = require('./media-sprites');
-const Textures = require('./textures');
-const colourizeSprite = require('./colourize-sprite');
+import EntitySprites from './entity-sprites.js';
+import MediaSprites from './media-sprites.js';
+import Textures from './textures.js';
 
-module.exports = { EntitySprites, MediaSprites, Textures, colourizeSprite };
+export { EntitySprites, MediaSprites, Textures };

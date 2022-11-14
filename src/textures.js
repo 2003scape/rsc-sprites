@@ -1,14 +1,15 @@
-const JagBuffer = require('@2003scape/rsc-archiver/src/jag-buffer');
-const compressSprites = require('./compress-sprites');
-const parseSprite = require('./parse-sprite');
-const { JagArchive } = require('@2003scape/rsc-archiver');
-const { createCanvas } = require('canvas');
+import { JagBuffer } from '@2003scape/rsc-archiver';
 
 // wall, floor and object textures for 3d models
 class Textures {
     constructor({ textures }) {
         this.textures = textures;
-        this.sprites = new Map();
+    }
+
+    async init() {
+        await this.archive.init();
+
+        this.Canvas = await getCanvasConstructor();
     }
 
     addTextureSprite(name, indexData, spriteData) {
@@ -17,14 +18,14 @@ class Textures {
         }
 
         spriteData = new JagBuffer(spriteData);
+
         this.sprites.set(name, parseSprite(spriteData, indexData, 1)[0]);
     }
 
     loadArchive(buffer) {
-        const archive = new JagArchive();
-        archive.readArchive(buffer);
+        this.archive.readArchive(buffer);
 
-        const indexData = new JagBuffer(archive.getEntry('index.dat'));
+        const indexData = new JagBuffer(this.archive.getEntry('index.dat'));
 
         for (const { name, subName } of this.textures) {
             if (name && name.length) {
@@ -41,10 +42,16 @@ class Textures {
 
     plotTexture(canvas, texture) {
         const { width, height } = canvas;
-        const ctx = canvas.getContext('2d');
 
-        const textureCtx = texture.getContext('2d');
-        const texturePixels = textureCtx.getImageData(0, 0, width, height).data;
+        const context = canvas.getContext('2d');
+        const textureContext = texture.getContext('2d');
+
+        const texturePixels = textureContext.getImageData(
+            0,
+            0,
+            width,
+            height
+        ).data;
 
         for (let i = 0; i < texturePixels.length; i += 4) {
             const a = texturePixels[i + 3];
@@ -58,35 +65,39 @@ class Textures {
             const b = texturePixels[i + 2];
 
             const x = (i / 4) % width;
-            const y = Math.floor((i / 4) / width);
+            const y = Math.floor(i / 4 / width);
 
             if (r === 0 && g === 255 && b === 0) {
-                ctx.clearRect(x, y, 1, 1);
+                context.clearRect(x, y, 1, 1);
             } else {
-                ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-                ctx.fillRect(x, y, 1, 1);
+                context.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                context.fillRect(x, y, 1, 1);
             }
         }
     }
 
     getMergedTexture(name, subName) {
-        const textureSprite = this.sprites.get(name);
+        const texture = this.sprites.get(name);
 
-        let { width, height } = textureSprite;
-        const patternCanvas = createCanvas(width, height);
-        this.plotTexture(patternCanvas, textureSprite);
+        let { width, height } = texture;
+        const patternCanvas = this.createCanvas(width, height);
 
-        const subSprite = this.sprites.get(subName);
-        width = Math.max(width, subSprite.width);
-        height = Math.max(width, subSprite.height);
+        this.plotTexture(patternCanvas, texture);
+
+        const subTexture = this.sprites.get(subName);
+
+        width = Math.max(width, subTexture.width);
+        height = Math.max(width, subTexture.height);
 
         const canvas = createCanvas(width, height);
-        const ctx = canvas.getContext('2d');
-        const pattern = ctx.createPattern(textureSprite, 'repeat');
-        ctx.fillStyle = pattern;
-        ctx.fillRect(0, 0, width, height);
+        const context = canvas.getContext('2d');
 
-        this.plotTexture(canvas, subSprite);
+        const pattern = context.createPattern(texture, 'repeat');
+
+        context.fillStyle = pattern;
+        context.fillRect(0, 0, width, height);
+
+        this.plotTexture(canvas, subTexture);
 
         return canvas;
     }
@@ -94,13 +105,14 @@ class Textures {
     // grab the texture sprites corresponding to a specific texture ID in
     // config's texture definitions (name and subName), and assemble a rendered
     // texture.
-    getTextureById(textureId) {
-        const { name, subName } = this.textures[textureId];
+    getTextureByID(textureID) {
+        const { name, subName } = this.textures[textureID];
         const textureSprite = this.sprites.get(name);
 
         if (!subName || !subName.length) {
             const { width, height } = textureSprite;
             const canvas = createCanvas(width, height);
+
             this.plotTexture(canvas, textureSprite);
 
             return canvas;
@@ -108,10 +120,6 @@ class Textures {
 
         return this.getMergedTexture(name, subName);
     }
-
-    toArchive() {
-        return compressSprites(this.sprites);
-    }
 }
 
-module.exports = Textures;
+export default Textures;

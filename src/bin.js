@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { Config } = require('@2003scape/rsc-config');
+import { Config } from '@2003scape/rsc-config';
 const fs = require('fs').promises;
 const mkdirp = require('mkdirp-promise');
 const path = require('path');
